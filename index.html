@@ -563,13 +563,20 @@
   sternEl.textContent = sterneGesamt;
 
   // ---------- Audiofeedback (WebAudio, keine Dateien noetig) ----------
-  // stufe erhoeht bei richtiger Antwort die Tonhoehe (Erfolgsserie hoert sich an)
+  // iOS/Safari: AudioContext erst nach Benutzeraktion starten und wieder aufnehmen
   var audioCtx = null;
-  function piep(richtig_, stufe) {
+  function audioFreischalten() {
     try {
       var Ctx = window.AudioContext || window.webkitAudioContext;
       if (!Ctx) return;
       if (!audioCtx) audioCtx = new Ctx();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+    } catch (e) { /* Ton ist optional */ }
+  }
+  function piep(richtig_, stufe) {
+    try {
+      audioFreischalten();
+      if (!audioCtx) return;
       var t = audioCtx.currentTime;
       var faktor = Math.pow(2, Math.min(stufe || 0, 12) / 12);
       var toene = richtig_
@@ -592,9 +599,8 @@
 
   function jingle() {
     try {
-      var Ctx = window.AudioContext || window.webkitAudioContext;
-      if (!Ctx) return;
-      if (!audioCtx) audioCtx = new Ctx();
+      audioFreischalten();
+      if (!audioCtx) return;
       var t = audioCtx.currentTime;
       [523, 659, 784, 1047, 1319].forEach(function (f, i) {
         var osc = audioCtx.createOscillator();
@@ -812,6 +818,7 @@
   }
 
   function antwortPruefen(zahl, btn) {
+    audioFreischalten(); // iOS: erster Tap auf Antwort-Button schaltet Audio frei
     var buttons = antwortenBox.querySelectorAll('.antwort-btn');
     buttons.forEach(function (b) { b.disabled = true; });
 
@@ -850,6 +857,7 @@
 
   weiterBtn.addEventListener('click', rundeStarten);
   startBtn.addEventListener('click', function () {
+    audioFreischalten(); // erster Tap schaltet Audio auf iOS frei
     startReihe.style.display = 'none';
     rundeStarten();
   });
