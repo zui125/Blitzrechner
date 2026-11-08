@@ -571,58 +571,68 @@
   sternEl.textContent = sterneGesamt;
 
   // ---------- Audiofeedback (WebAudio, keine Dateien noetig) ----------
-  // iOS/Safari: AudioContext erst nach Benutzeraktion starten und wieder aufnehmen
+  // iOS/Safari: AudioContext erst nach Benutzeraktion starten und das
+  // resume() abwarten, bevor Töne geplant werden (sonst bleiben sie stumm).
   var audioCtx = null;
   function audioFreischalten() {
+    audioBereit();
+  }
+  // Liefert ein Promise, das true ergibt, sobald der Kontext wirklich laeuft.
+  function audioBereit() {
     try {
       var Ctx = window.AudioContext || window.webkitAudioContext;
-      if (!Ctx) return;
+      if (!Ctx) return Promise.resolve(false);
       if (!audioCtx) audioCtx = new Ctx();
-      if (audioCtx.state === 'suspended') audioCtx.resume();
-    } catch (e) { /* Ton ist optional */ }
-  }
-  function piep(richtig_, stufe) {
-    try {
-      audioFreischalten();
-      if (!audioCtx) return;
-      var t = audioCtx.currentTime;
-      var faktor = Math.pow(2, Math.min(stufe || 0, 12) / 12);
-      var toene = richtig_
-        ? [[523 * faktor, 0], [784 * faktor, 0.12]]
-        : [[220, 0], [165, 0.15]];
-      toene.forEach(function (ton) {
-        var osc = audioCtx.createOscillator();
-        var gain = audioCtx.createGain();
-        osc.type = 'triangle';
-        osc.frequency.value = ton[0];
-        gain.gain.setValueAtTime(0.0001, t + ton[1]);
-        gain.gain.exponentialRampToValueAtTime(0.25, t + ton[1] + 0.02);
-        gain.gain.exponentialRampToValueAtTime(0.0001, t + ton[1] + 0.25);
-        osc.connect(gain).connect(audioCtx.destination);
-        osc.start(t + ton[1]);
-        osc.stop(t + ton[1] + 0.3);
+      if (audioCtx.state === 'running') return Promise.resolve(true);
+      return audioCtx.resume().then(function () {
+        return audioCtx.state === 'running';
+      }).catch(function () {
+        return audioCtx.state === 'running';
       });
-    } catch (e) { /* Ton ist optional, Spiel bleibt nutzbar */ }
+    } catch (e) {
+      return Promise.resolve(false);
+    }
+  }
+
+  function tonSpielen(freq, start, dauer) {
+    var osc = audioCtx.createOscillator();
+    var gain = audioCtx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.value = freq;
+    var t = audioCtx.currentTime + start;
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(0.25, t + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + dauer);
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start(t);
+    osc.stop(t + dauer + 0.05);
+  }
+
+  function piep(richtig_, stufe) {
+    audioBereit().then(function (bereit) {
+      if (!bereit) return;
+      try {
+        var faktor = Math.pow(2, Math.min(stufe || 0, 12) / 12);
+        if (richtig_) {
+          tonSpielen(523 * faktor, 0, 0.25);
+          tonSpielen(784 * faktor, 0.12, 0.25);
+        } else {
+          tonSpielen(220, 0, 0.25);
+          tonSpielen(165, 0.15, 0.3);
+        }
+      } catch (e) { /* Ton ist optional, Spiel bleibt nutzbar */ }
+    });
   }
 
   function jingle() {
-    try {
-      audioFreischalten();
-      if (!audioCtx) return;
-      var t = audioCtx.currentTime;
-      [523, 659, 784, 1047, 1319].forEach(function (f, i) {
-        var osc = audioCtx.createOscillator();
-        var gain = audioCtx.createGain();
-        osc.type = 'triangle';
-        osc.frequency.value = f;
-        gain.gain.setValueAtTime(0.0001, t + i * 0.11);
-        gain.gain.exponentialRampToValueAtTime(0.25, t + i * 0.11 + 0.02);
-        gain.gain.exponentialRampToValueAtTime(0.0001, t + i * 0.11 + 0.3);
-        osc.connect(gain).connect(audioCtx.destination);
-        osc.start(t + i * 0.11);
-        osc.stop(t + i * 0.11 + 0.35);
-      });
-    } catch (e) { /* Ton ist optional */ }
+    audioBereit().then(function (bereit) {
+      if (!bereit) return;
+      try {
+        [523, 659, 784, 1047, 1319].forEach(function (f, i) {
+          tonSpielen(f, i * 0.11, 0.3);
+        });
+      } catch (e) { /* Ton ist optional */ }
+    });
   }
 
   // ---------- Einstellungen lesen ----------
