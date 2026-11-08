@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Blitzblick-Training &ndash; Punktedetektive</title>
+<style>
+  :root {
+    --blau: #2b5aa6;
+    --blau-dunkel: #1d3f7a;
+    --anzeige: #16325c;
+    --gruen: #3ec46d;
+    --rot: #e8544f;
+    --gelb: #ffce3d;
+    --hintergrund: #f0f5ff;
+    --text: #22314f;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: "Comic Sans MS", "Trebuchet MS", "Verdana", sans-serif;
+    background: linear-gradient(160deg, #e8f1ff 0%, #f6f9ff 60%, #fff 100%);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  .seite {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 20px 16px 48px;
+  }
+
+  /* ---------- Kopf ---------- */
+  header {
+    text-align: center;
+    padding: 24px 12px 20px;
+  }
+  header h1 {
+    color: var(--blau-dunkel);
+    font-size: 2rem;
+    letter-spacing: 0.5px;
+  }
+  header p {
+    margin-top: 6px;
+    font-size: 1.05rem;
+    color: #4a5b7d;
+  }
+
+  /* ---------- Layout ---------- */
+  .haupt-layout {
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    gap: 20px;
+    align-items: start;
+    margin-top: 16px;
+  }
+  @media (max-width: 760px) {
+    .haupt-layout { grid-template-columns: 1fr; }
+  }
+
+  .karte {
+    background: #fff;
+    border-radius: 22px;
+    box-shadow: 0 8px 24px rgba(43, 90, 166, 0.14);
+    padding: 20px;
+  }
+
+  h2 {
+    color: var(--blau-dunkel);
+    font-size: 1.15rem;
+    margin-bottom: 12px;
+  }
+
+  /* ---------- Einstellungen ---------- */
+  .feld {
+    margin-bottom: 22px;
+  }
+  .feld-label {
+    font-size: 0.95rem;
+    font-weight: bold;
+    color: var(--blau-dunkel);
+    margin-bottom: 8px;
+    display: block;
+  }
+  .wahl-gruppe {
+    display: grid;
+    gap: 8px;
+  }
+  .wahl-gruppe.drei { grid-template-columns: repeat(3, 1fr); }
+  .wahl-gruppe.vier { grid-template-columns: repeat(2, 1fr); }
+
+  .wahl {
+    position: relative;
+  }
+  .wahl input {
+    position: absolute;
+    opacity: 0;
+    width: 100%;
+    height: 100%;
+    cursor: pointer;
+    z-index: 2;
+  }
+  .wahl span {
+    display: block;
+    text-align: center;
+    padding: 10px 6px;
+    border-radius: 14px;
+    border: 3px solid #d7e3f8;
+    background: #f7faff;
+    font-weight: bold;
+    font-size: 0.95rem;
+    color: var(--text);
+    transition: all 0.15s ease;
+  }
+  .wahl input:checked + span {
+    border-color: var(--blau);
+    background: #e3edff;
+    color: var(--blau-dunkel);
+    transform: scale(1.03);
+  }
+  .wahl .klein { display: block; font-weight: normal; font-size: 0.78rem; color: #63759c; }
+
+  .tipp-box {
+    background: #fff8dc;
+    border-left: 6px solid var(--gelb);
+    border-radius: 0 12px 12px 0;
+    padding: 10px 12px;
+    font-size: 0.85rem;
+    line-height: 1.45;
+    color: #6b5a1e;
+    margin-top: 16px;
+  }
+
+  /* ---------- Statistik ---------- */
+  .statistik {
+    display: flex;
+    gap: 10px;
+  }
+  .stat-box {
+    flex: 1;
+    background: #eef4ff;
+    border-radius: 16px;
+    text-align: center;
+    padding: 12px 6px;
+  }
+  .stat-box .wert {
+    font-size: 1.6rem;
+    font-weight: bold;
+    color: var(--blau-dunkel);
+  }
+  .stat-box .name { font-size: 0.78rem; color: #63759c; }
+
+  /* ---------- Spielkarte ---------- */
+  .spiel-text {
+    text-align: center;
+    font-size: 1.1rem;
+    color: var(--blau-dunkel);
+    min-height: 1.6em;
+    margin-bottom: 12px;
+  }
+
+  .anzeigefeld {
+    position: relative;
+    width: 100%;
+    max-width: 340px;
+    aspect-ratio: 1;
+    margin: 0 auto 18px;
+    background: radial-gradient(circle at 50% 40%, #234a86 0%, var(--anzeige) 70%);
+    border-radius: 26px;
+    box-shadow: inset 0 4px 14px rgba(0, 0, 0, 0.35);
+    overflow: hidden;
+  }
+  .anzeigefeld.flackert {
+    animation: flackern 0.25s ease;
+  }
+  @keyframes flackern {
+    0% { box-shadow: inset 0 4px 14px rgba(0,0,0,0.35), 0 0 0 0 rgba(62,196,109,0.6); }
+    100% { box-shadow: inset 0 4px 14px rgba(0,0,0,0.35), 0 0 0 26px rgba(62,196,109,0); }
+  }
+
+  @keyframes punkt-auf {
+    to { transform: translate(-50%, -50%) scale(1); }
+  }
+
+  /* ---------- Feld-Darstellung (Fuenfer-/Zehnerfeld) ---------- */
+  .kreis {
+    position: absolute;
+    width: 15%;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    border: 4px solid rgba(255, 255, 255, 0.35);
+    background: transparent;
+    transform: translate(-50%, -50%);
+  }
+  .kreis.gefuellt {
+    border-color: #9cc4ff;
+    background: radial-gradient(circle at 35% 30%, #9cc4ff 0%, #4a90f7 45%, #2b5aa6 100%);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+    transform: translate(-50%, -50%) scale(0);
+    animation: punkt-auf 0.2s ease forwards;
+  }
+
+  /* ---------- Wuerfel-Darstellung ---------- */
+  .wuerfel {
+    position: absolute;
+    width: 56%;
+    aspect-ratio: 1;
+    background: linear-gradient(160deg, #ffffff 0%, #e9edf5 100%);
+    border-radius: 16%;
+    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.45), inset 0 -4px 8px rgba(0, 0, 0, 0.08);
+    transform: translate(-50%, -50%) scale(0);
+    animation: wuerfel-auf 0.25s ease forwards;
+  }
+  .wuerfel.einzeln { left: 50%; top: 50%; }
+  .wuerfel.links  { left: 27%; top: 50%; width: 38%; }
+  .wuerfel.rechts { left: 73%; top: 50%; width: 38%; }
+  @keyframes wuerfel-auf {
+    to { transform: translate(-50%, -50%) scale(1); }
+  }
+  .wuerfel .auge {
+    position: absolute;
+    width: 19%;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #4a4a4a 0%, #111111 70%);
+    transform: translate(-50%, -50%) scale(0);
+    animation: punkt-auf 0.15s ease 0.1s forwards;
+  }
+
+  /* ---------- Strichlisten-Darstellung ---------- */
+  .strich {
+    position: absolute;
+    top: 50%;
+    width: 2.8%;
+    height: 56%;
+    background: linear-gradient(90deg, #ffffff 0%, #dfe8f5 100%);
+    border-radius: 999px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.45);
+    transform: translate(-50%, -50%);
+    opacity: 0;
+    animation: strich-auf 0.15s ease forwards;
+  }
+  .strich.diagonal {
+    width: 42%;
+    height: 3%;
+    transform: translate(-50%, -50%) rotate(-24deg);
+  }
+  @keyframes strich-auf {
+    to { opacity: 1; }
+  }
+
+  /* ---------- Sternchen-Leiste ---------- */
+  .stern-leiste {
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    min-height: 34px;
+    margin-bottom: 12px;
+  }
+  .stern { width: 30px; height: 30px; }
+  .stern svg { width: 100%; height: 100%; display: block; }
+  .stern path { fill: #dbe5f5; stroke: #b9c9e4; stroke-width: 6; }
+  .stern.voll path { fill: #ffce3d; stroke: #e8a800; }
+  .stern.voll {
+    animation: stern-pop 0.45s cubic-bezier(0.2, 1.6, 0.4, 1);
+    filter: drop-shadow(0 0 6px rgba(255, 206, 61, 0.8));
+  }
+  @keyframes stern-pop {
+    0% { transform: scale(0) rotate(-40deg); }
+    60% { transform: scale(1.5) rotate(12deg); }
+    100% { transform: scale(1) rotate(0deg); }
+  }
+
+  /* ---------- Feier-Animation bei vollen 10 Sternen ---------- */
+  .feier {
+    position: absolute;
+    inset: 0;
+    z-index: 6;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    background: rgba(22, 50, 92, 0.94);
+  }
+  .feier .gross-stern { width: 92px; height: 92px; animation: stern-pop 0.6s cubic-bezier(0.2, 1.6, 0.4, 1); }
+  .feier .gross-stern path { fill: #ffce3d; stroke: #e8a800; stroke-width: 5; }
+  .feier .feier-text { color: #fff; font-weight: bold; font-size: 1.1rem; text-align: center; padding: 0 12px; }
+  .konfetti {
+    position: absolute;
+    top: -14px;
+    width: 10px;
+    height: 16px;
+    border-radius: 3px;
+    animation: konfetti-fall 2.4s ease-in forwards;
+  }
+  @keyframes konfetti-fall {
+    to { transform: translateY(390px) rotate(680deg); opacity: 0.85; }
+  }
+
+  .fragezeichen {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 4.2rem;
+    color: #8fb4e8;
+    text-shadow: 0 3px 8px rgba(0, 0, 0, 0.4);
+  }
+  .fragezeichen.versteckt { display: none; }
+
+  /* ---------- Antwortknoepfe ---------- */
+  .antworten {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+    max-width: 520px;
+    margin: 0 auto;
+  }
+  .antwort-btn {
+    width: 64px;
+    height: 64px;
+    border-radius: 18px;
+    border: 3px solid var(--blau);
+    background: #fff;
+    color: var(--blau-dunkel);
+    font-size: 1.5rem;
+    font-weight: bold;
+    font-family: inherit;
+    cursor: pointer;
+    transition: transform 0.1s ease, background 0.1s ease;
+  }
+  .antwort-btn:hover { background: #e3edff; transform: translateY(-2px); }
+  .antwort-btn:disabled { opacity: 0.55; cursor: default; transform: none; }
+  .antwort-btn.richtig {
+    background: var(--gruen);
+    border-color: #2aa955;
+    color: #fff;
+  }
+  .antwort-btn.falsch {
+    background: var(--rot);
+    border-color: #c93b37;
+    color: #fff;
+  }
+  .antworten.versteckt { display: none; }
+
+  .feedback {
+    text-align: center;
+    font-size: 1.1rem;
+    font-weight: bold;
+    min-height: 1.5em;
+    margin-top: 14px;
+  }
+  .feedback.gut { color: #2aa955; }
+  .feedback.schlecht { color: #c93b37; }
+
+  /* ---------- grosse Buttons ---------- */
+  .aktion-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border: none;
+    border-radius: 999px;
+    padding: 14px 30px;
+    font-size: 1.15rem;
+    font-weight: bold;
+    font-family: inherit;
+    cursor: pointer;
+    color: #fff;
+    background: linear-gradient(180deg, #3f74c4 0%, var(--blau) 100%);
+    box-shadow: 0 5px 0 var(--blau-dunkel);
+    transition: transform 0.08s ease, box-shadow 0.08s ease;
+  }
+  .aktion-btn:active { transform: translateY(3px); box-shadow: 0 2px 0 var(--blau-dunkel); }
+  .aktion-btn:disabled { opacity: 0.6; cursor: default; }
+  .aktion-btn.neben {
+    background: none;
+    box-shadow: none;
+    color: #63759c;
+    font-size: 0.9rem;
+    font-weight: normal;
+    padding: 8px 12px;
+    text-decoration: underline;
+  }
+  .aktion-btn.neben:active { transform: none; }
+
+  .start-reihe {
+    text-align: center;
+  }
+  .spiel-action { text-align: center; margin-top: 4px; }
+
+  /* ---------- Detektiv-Info unten ---------- */
+  .info-unten {
+    margin-top: 28px;
+    text-align: center;
+    font-size: 0.9rem;
+    color: #4a5b7d;
+    line-height: 1.5;
+  }
+  .info-unten strong { color: var(--blau-dunkel); }
+
+  .icon-play {
+    width: 0; height: 0;
+    border-top: 9px solid transparent;
+    border-bottom: 9px solid transparent;
+    border-left: 15px solid currentColor;
+    display: inline-block;
+  }
+</style>
+</head>
+<body>
+<div class="seite">
+
+  <header>
+    <h1>Punktedetektive &ndash; Blitzblick-Training</h1>
+    <p>Schau genau hin. Wie viele siehst du auf einen Blick?</p>
+  </header>
+
+  <div class="haupt-layout">
+
+    <!-- ===== Spalte links: Einstellungen ===== -->
+    <section class="karte" id="einstellungen-karte">
+      <h2>Spiel einstellen</h2>
+
+      <div class="feld">
+        <span class="feld-label">Zahlenmenge</span>
+        <div class="wahl-gruppe drei">
+          <label class="wahl"><input type="radio" name="menge" value="4"><span>0&ndash;4</span></label>
+          <label class="wahl"><input type="radio" name="menge" value="6" checked><span>0&ndash;6</span></label>
+          <label class="wahl"><input type="radio" name="menge" value="10"><span>0&ndash;10</span></label>
+        </div>
+      </div>
+
+      <div class="feld">
+        <span class="feld-label">Schwierigkeitsstufe</span>
+        <div class="wahl-gruppe vier">
+          <label class="wahl">
+            <input type="radio" name="stufe" value="0" checked>
+            <span>Stufe 1<span class="klein">2,0 Sekunden</span></span>
+          </label>
+          <label class="wahl">
+            <input type="radio" name="stufe" value="1">
+            <span>Stufe 2<span class="klein">1,4 Sekunden</span></span>
+          </label>
+          <label class="wahl">
+            <input type="radio" name="stufe" value="2">
+            <span>Stufe 3<span class="klein">1,0 Sekunden</span></span>
+          </label>
+          <label class="wahl">
+            <input type="radio" name="stufe" value="3">
+            <span>Stufe 4<span class="klein">0,8 Sekunden</span></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="statistik">
+        <div class="stat-box">
+          <div class="wert" id="runden-count">0</div>
+          <div class="name">Runden gespielt</div>
+        </div>
+        <div class="stat-box">
+          <div class="wert" id="richtig-count">0</div>
+          <div class="name">Richtig erkannt</div>
+        </div>
+        <div class="stat-box">
+          <div class="wert" id="stern-count">0</div>
+          <div class="name">Sterne gesamt</div>
+        </div>
+      </div>
+
+      <div class="tipp-box">
+        F&uuml;r den Einstieg sind 0&ndash;4 Punkte ideal. Starte mit Stufe 1
+        (2,0 Sekunden) und mach dann schneller. Ab 6 Punkten helfen geordnete
+        Muster dabei, Teilmengen zu erkennen: erst die 4 sehen, dann 2 dazu.<br>
+        Bei den Feld-Bildern z&auml;hlst du nur die ausgef&uuml;llten Kreise &ndash;
+        die leeren Kreise gelten als nichts. Beim W&uuml;rfel z&auml;hlst du die
+        Augen; ab 7 erscheinen zwei W&uuml;rfel. Bei der Strichliste z&auml;hlst
+        du die Striche &ndash; immer 5 Striche werden zu einem B&uuml;ndel
+        durchgestrichen.
+      </div>
+    </section>
+
+    <!-- ===== Spalte rechts: Spiel ===== -->
+    <section class="karte">
+      <div class="spiel-text" id="spiel-text">Bereit f&uuml;r Runde 1?</div>
+
+      <div class="stern-leiste" id="stern-leiste"></div>
+
+      <div class="anzeigefeld" id="anzeigefeld">
+        <div class="fragezeichen" id="fragezeichen">?</div>
+      </div>
+
+      <div class="start-reihe" id="start-reihe">
+        <button class="aktion-btn" id="start-btn">
+          <span class="icon-play"></span> AUGEN AUF
+        </button>
+        <div>
+          <button class="aktion-btn neben" id="neu-btn">Neu beginnen</button>
+        </div>
+      </div>
+
+      <div class="antworten versteckt" id="antworten"></div>
+      <div class="feedback" id="feedback" aria-live="polite"></div>
+      <div class="spiel-action">
+        <button class="aktion-btn versteckt" id="weiter-btn" style="display:none;">N&auml;chste Runde</button>
+      </div>
+    </section>
+
+  </div>
+
+  <div class="info-unten">
+    <strong>Punktedetektive</strong><br>
+    Greifbare Mengen erkennen und zuordnen &ndash; Bilder auf einen Blick z&auml;hlen,
+    ohne einzeln abzuz&auml;hlen.
+  </div>
+
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var ANZEIGEDAUERN = [2.0, 1.4, 1.0, 0.8];
+
+  // Geordnete Wuerfel-Augen: Positionen in Prozent (x, y) innerhalb des Wuerfels.
+  var MUSTER = {
+    0: [],
+    1: [[50, 50]],
+    2: [[30, 30], [70, 70]],
+    3: [[28, 28], [50, 50], [72, 72]],
+    4: [[28, 28], [72, 28], [28, 72], [72, 72]],
+    5: [[28, 28], [72, 28], [50, 50], [28, 72], [72, 72]],
+    6: [[28, 28], [72, 28], [28, 50], [72, 50], [28, 72], [72, 72]]
+  };
+
+  var feld = document.getElementById('anzeigefeld');
+  var fragezeichen = document.getElementById('fragezeichen');
+  var spielText = document.getElementById('spiel-text');
+  var startReihe = document.getElementById('start-reihe');
+  var startBtn = document.getElementById('start-btn');
+  var neuBtn = document.getElementById('neu-btn');
+  var antwortenBox = document.getElementById('antworten');
+  var feedbackBox = document.getElementById('feedback');
+  var weiterBtn = document.getElementById('weiter-btn');
+  var rundenEl = document.getElementById('runden-count');
+  var richtigEl = document.getElementById('richtig-count');
+  var sternEl = document.getElementById('stern-count');
+  var sternLeiste = document.getElementById('stern-leiste');
+
+  var runden = 0;
+  var richtig = 0;
+  var aktuelleZahl = 0;
+  var aktuelleDarstellung = 'feld'; // 'feld', 'wuerfel' oder 'striche'
+  var timer = null;
+  var sterne = 0;          // volle Sterne in der aktuellen Leiste (max 10)
+  var serie = 0;           // richtige Antworten in Folge
+  var sterneGesamt = 0;    // dauerhaft gespeicherte Sterne
+  try {
+    sterneGesamt = parseInt(window.localStorage.getItem('blitzblick-sterne') || '0', 10) || 0;
+  } catch (e) { sterneGesamt = 0; }
+  sternEl.textContent = sterneGesamt;
+
+  // ---------- Audiofeedback (WebAudio, keine Dateien noetig) ----------
+  // stufe erhoeht bei richtiger Antwort die Tonhoehe (Erfolgsserie hoert sich an)
+  var audioCtx = null;
+  function piep(richtig_, stufe) {
+    try {
+      var Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      if (!audioCtx) audioCtx = new Ctx();
+      var t = audioCtx.currentTime;
+      var faktor = Math.pow(2, Math.min(stufe || 0, 12) / 12);
+      var toene = richtig_
+        ? [[523 * faktor, 0], [784 * faktor, 0.12]]
+        : [[220, 0], [165, 0.15]];
+      toene.forEach(function (ton) {
+        var osc = audioCtx.createOscillator();
+        var gain = audioCtx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.value = ton[0];
+        gain.gain.setValueAtTime(0.0001, t + ton[1]);
+        gain.gain.exponentialRampToValueAtTime(0.25, t + ton[1] + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t + ton[1] + 0.25);
+        osc.connect(gain).connect(audioCtx.destination);
+        osc.start(t + ton[1]);
+        osc.stop(t + ton[1] + 0.3);
+      });
+    } catch (e) { /* Ton ist optional, Spiel bleibt nutzbar */ }
+  }
+
+  function jingle() {
+    try {
+      var Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      if (!audioCtx) audioCtx = new Ctx();
+      var t = audioCtx.currentTime;
+      [523, 659, 784, 1047, 1319].forEach(function (f, i) {
+        var osc = audioCtx.createOscillator();
+        var gain = audioCtx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.value = f;
+        gain.gain.setValueAtTime(0.0001, t + i * 0.11);
+        gain.gain.exponentialRampToValueAtTime(0.25, t + i * 0.11 + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t + i * 0.11 + 0.3);
+        osc.connect(gain).connect(audioCtx.destination);
+        osc.start(t + i * 0.11);
+        osc.stop(t + i * 0.11 + 0.35);
+      });
+    } catch (e) { /* Ton ist optional */ }
+  }
+
+  // ---------- Einstellungen lesen ----------
+  function mengeMax() {
+    var el = document.querySelector('input[name="menge"]:checked');
+    return el ? parseInt(el.value, 10) : 6;
+  }
+  function dauer() {
+    var el = document.querySelector('input[name="stufe"]:checked');
+    var idx = el ? parseInt(el.value, 10) : 0;
+    return ANZEIGEDAUERN[idx] * 1000;
+  }
+
+  // ---------- Spielablauf ----------
+  function alleBilderWeg() {
+    feld.querySelectorAll('.kreis, .wuerfel, .strich, .feier, .konfetti').forEach(function (el) { el.remove(); });
+  }
+
+  // ---------- Sternchen-Leiste ----------
+  var STERN_PFAD = 'M50 6 L61.8 38.2 L96 38.2 L68.6 59 L79.4 92.4 L50 71.4 L20.6 92.4 L31.4 59 L4 38.2 L38.2 38.2 Z';
+  function sternSvg() {
+    return '<svg viewBox="0 0 100 100"><path d="' + STERN_PFAD + '"/></svg>';
+  }
+
+  function sternLeisteAufbauen() {
+    sternLeiste.innerHTML = '';
+    for (var i = 0; i < 10; i++) {
+      var s = document.createElement('div');
+      s.className = 'stern' + (i < sterne ? ' voll' : '');
+      s.innerHTML = sternSvg();
+      sternLeiste.appendChild(s);
+    }
+  }
+
+  // Feier-Overlay mit grossem Stern und Konfetti im Anzeigefeld
+  function feiern() {
+    var overlay = document.createElement('div');
+    overlay.className = 'feier';
+    overlay.innerHTML = '<div class="gross-stern"><svg viewBox="0 0 100 100"><path d="' + STERN_PFAD + '"/></svg></div>' +
+      '<div class="feier-text">Super! Alle 10 Sterne gesammelt!</div>';
+    feld.appendChild(overlay);
+    var farben = ['#ffce3d', '#3ec46d', '#e8544f', '#4a90f7', '#ff9de2'];
+    for (var i = 0; i < 26; i++) {
+      var k = document.createElement('div');
+      k.className = 'konfetti';
+      k.style.left = Math.random() * 96 + '%';
+      k.style.background = farben[i % farben.length];
+      k.style.animationDelay = (Math.random() * 0.5) + 's';
+      feld.appendChild(k);
+    }
+    jingle();
+  }
+
+  // Gibt true zurueck, wenn die Leiste voll war (Feier laeuft)
+  function sternErbracht() {
+    sterne++;
+    sterneGesamt++;
+    sternEl.textContent = sterneGesamt;
+    try { window.localStorage.setItem('blitzblick-sterne', String(sterneGesamt)); } catch (e) { /* optional */ }
+    if (sterne >= 10) {
+      sternLeisteAufbauen();
+      feiern();
+      sterne = 0;
+      sternLeisteAufbauen();
+      return true;
+    }
+    sternLeisteAufbauen();
+    return false;
+  }
+
+  // Wuerfel-Bild: bis 6 ein Wuerfel, ab 7 zwei Wuerfel im Fuenfer-Muster (z. B. 7 = 5 + 2)
+  function wuerfelZeigen(anzahl) {
+    alleBilderWeg();
+    fragezeichen.classList.add('versteckt');
+    var max = mengeMax();
+    var werte = (max > 6 && anzahl > 6) ? [5, anzahl - 5] : [anzahl];
+    werte.forEach(function (w, i) {
+      var wuerfel = document.createElement('div');
+      wuerfel.className = 'wuerfel ' + (werte.length === 1 ? 'einzeln' : (i === 0 ? 'links' : 'rechts'));
+      MUSTER[w].forEach(function (pos) {
+        var auge = document.createElement('div');
+        auge.className = 'auge';
+        auge.style.left = pos[0] + '%';
+        auge.style.top = pos[1] + '%';
+        wuerfel.appendChild(auge);
+      });
+      feld.appendChild(wuerfel);
+    });
+  }
+
+  // Fuenferfeld (eine Reihe, bis 4) oder Zehnerfeld (zwei Reihen zu fuenf)
+  function feldPositionen(max) {
+    var xs = [12, 31, 50, 69, 88];
+    var pos = [];
+    var reihenY = max <= 4 ? [50] : [30, 70];
+    reihenY.forEach(function (y) {
+      xs.forEach(function (x) { pos.push([x, y]); });
+    });
+    return pos;
+  }
+
+  function feldZeigen(anzahl) {
+    alleBilderWeg();
+    fragezeichen.classList.add('versteckt');
+    feldPositionen(mengeMax()).forEach(function (pos, i) {
+      var kreis = document.createElement('div');
+      kreis.className = 'kreis' + (i < anzahl ? ' gefuellt' : '');
+      kreis.style.left = pos[0] + '%';
+      kreis.style.top = pos[1] + '%';
+      feld.appendChild(kreis);
+    });
+  }
+
+  // Strichliste: Fuenfer-Buendel (vier senkrecht + ein schraeger Durchstreich-Strich)
+  function strichZeichnen(x, diagonal) {
+    var s = document.createElement('div');
+    s.className = 'strich' + (diagonal ? ' diagonal' : '');
+    s.style.left = x + '%';
+    feld.appendChild(s);
+  }
+
+  function stricheZeigen(anzahl) {
+    alleBilderWeg();
+    fragezeichen.classList.add('versteckt');
+    var volle = Math.floor(anzahl / 5);
+    var rest = anzahl % 5;
+    var gruppen = volle + (rest > 0 ? 1 : 0);
+    var mittelpunkte = gruppen <= 1 ? [50] : [31, 69];
+    var g = 0;
+    for (var i = 0; i < volle; i++) {
+      var cx = mittelpunkte[g++];
+      [-13.5, -4.5, 4.5, 13.5].forEach(function (o) { strichZeichnen(cx + o, false); });
+      strichZeichnen(cx, true);
+    }
+    for (var r = 0; r < rest; r++) {
+      var rx = mittelpunkte[g];
+      strichZeichnen(rx + (r - (rest - 1) / 2) * 9.5, false);
+    }
+  }
+
+  function bildWeg() {
+    alleBilderWeg();
+    fragezeichen.classList.remove('versteckt');
+  }
+
+  // Pro Runde zufaellig zwischen Feld-Bild, Wuerfel und Strichliste wechseln.
+  function darstellungWaehlen() {
+    var wahl = Math.floor(Math.random() * 3);
+    return wahl === 0 ? 'feld' : wahl === 1 ? 'wuerfel' : 'striche';
+  }
+
+  function bildZeigen(anzahl) {
+    if (aktuelleDarstellung === 'wuerfel') wuerfelZeigen(anzahl);
+    else if (aktuelleDarstellung === 'striche') stricheZeigen(anzahl);
+    else feldZeigen(anzahl);
+  }
+
+  function antwortenAufbauen(max) {
+    antwortenBox.innerHTML = '';
+    for (var n = 0; n <= max; n++) {
+      (function (zahl) {
+        var btn = document.createElement('button');
+        btn.className = 'antwort-btn';
+        btn.textContent = zahl;
+        btn.addEventListener('click', function () { antwortPruefen(zahl, btn); });
+        antwortenBox.appendChild(btn);
+      })(n);
+    }
+  }
+
+  function rundeStarten() {
+    clearTimeout(timer);
+    var max = mengeMax();
+    aktuelleZahl = Math.floor(Math.random() * (max + 1));
+    aktuelleDarstellung = darstellungWaehlen();
+
+    antwortenBox.classList.add('versteckt');
+    antwortenBox.innerHTML = '';
+    weiterBtn.style.display = 'none';
+    feedbackBox.textContent = '';
+    feedbackBox.className = 'feedback';
+    runden++;
+    rundenEl.textContent = runden;
+
+    spielText.textContent = 'Augen auf!';
+    bildZeigen(aktuelleZahl);
+    feld.classList.remove('flackert');
+    void feld.offsetWidth;
+    feld.classList.add('flackert');
+
+    timer = setTimeout(function () {
+      bildWeg();
+      spielText.textContent = aktuelleDarstellung === 'feld'
+        ? 'Wie viele volle Kreise waren es?'
+        : aktuelleDarstellung === 'wuerfel'
+          ? 'Wie viele Augen waren es?'
+          : 'Wie viele Striche waren es?';
+      antwortenAufbauen(max);
+      antwortenBox.classList.remove('versteckt');
+    }, dauer());
+  }
+
+  function antwortPruefen(zahl, btn) {
+    var buttons = antwortenBox.querySelectorAll('.antwort-btn');
+    buttons.forEach(function (b) { b.disabled = true; });
+
+    var istRichtig = zahl === aktuelleZahl;
+    if (istRichtig) {
+      btn.classList.add('richtig');
+      richtig++;
+      richtigEl.textContent = richtig;
+      serie++;
+      var volleLeiste = sternErbracht();
+      piep(true, serie);
+    } else {
+      btn.classList.add('falsch');
+      buttons[aktuelleZahl].classList.add('richtig');
+      serie = 0;
+      piep(false);
+    }
+
+    spielText.textContent = istRichtig
+      ? 'Richtig! ' + aktuelleZahl + ' Punkte.'
+      : 'Fast! Es waren ' + aktuelleZahl + ' Punkte.';
+    feedbackBox.textContent = istRichtig ? 'Super Blitzblick!' : 'Schau nochmal genau hin!';
+    feedbackBox.className = 'feedback ' + (istRichtig ? 'gut' : 'schlecht');
+
+    if (istRichtig) {
+      // Richtig: kurz Feedback zeigen, dann automatisch weiter
+      // (bei voller Sternleiste etwas laenger feiern lassen)
+      timer = setTimeout(rundeStarten, volleLeiste ? 3000 : 1200);
+    } else {
+      // Falsch: Bild noch einmal zeigen und auf den Button warten
+      bildZeigen(aktuelleZahl);
+      weiterBtn.textContent = 'N\u00e4chste Runde';
+      weiterBtn.style.display = '';
+    }
+  }
+
+  weiterBtn.addEventListener('click', rundeStarten);
+  startBtn.addEventListener('click', function () {
+    startReihe.style.display = 'none';
+    rundeStarten();
+  });
+  neuBtn.addEventListener('click', function () {
+    clearTimeout(timer);
+    bildWeg();
+    startReihe.style.display = '';
+    antwortenBox.classList.add('versteckt');
+    antwortenBox.innerHTML = '';
+    weiterBtn.style.display = 'none';
+    feedbackBox.textContent = '';
+    feedbackBox.className = 'feedback';
+    runden = 0;
+    richtig = 0;
+    sterne = 0;
+    serie = 0;
+    sternLeisteAufbauen();
+    rundenEl.textContent = '0';
+    richtigEl.textContent = '0';
+    spielText.textContent = 'Bereit f&uuml;r Runde 1?';
+  });
+
+  sternLeisteAufbauen();
+})();
+</script>
+</body>
+</html>
