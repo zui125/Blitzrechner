@@ -27,6 +27,15 @@ Einfach `index.html` doppelklicken – fertig.
 
 Diese URL kannst du der Klasse geben (als Link in Teams/SharePoint oder als QR-Code).
 
+## QR-Code für die Kinder (zum Scannen statt Tippen)
+Im Repo liegt die Datei **`qr-code.png`** – sie codiert die URL `https://zui125.github.io/Blitzrechner/`.
+- PNG herunterladen (github.com/zui125/Blitzrechner → qr-code.png → Download) oder direkt im Repo anklicken.
+- Ausgedruckt an die Tafel/Tür hängen oder als Bild in Teams/SharePoint posten.
+- Die Kinder scannen den Code mit dem iPhone: Kamera-App auf den Code richten **oder** Kontrollzentrum → QR-Code-Scanner. Safari öffnet die Seite automatisch.
+- Auf Android: Kamera-App oder Google Lens.
+
+Zum Selber-Erzeugen (z. B. nach Aenderung der URL): `python3 -c "import qrcode; qrcode.make('https://zui125.github.io/Blitzrechner/').save('qr-code.png')"`
+
 ## Änderungen veröffentlichen
 Nach jeder Änderung an `index.html`:
 ```
